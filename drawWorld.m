@@ -6,8 +6,10 @@
  % 2 = equiluminous colours for walls and rooms
  % 0 = no texturing, the same as it looks on the web
 
-function [offx, offy] = drawWorld( win, gridworld, visible, agent_x, agent_y, W, H, ...
-    imageDisplay, cellsize, texture_appearance, wallTex )
+function [offx, offy] = drawWorld( win, gridworld, visible, ...
+    agent_x, agent_y, W, H, ...
+    imageDisplay, cellsize, texture_appearance, wallTex, ...
+    debug_show_filenames, worldname )
     
     width = cellsize*size(gridworld,2); % x
     height = cellsize*size(gridworld,1); % y
@@ -81,6 +83,10 @@ function [offx, offy] = drawWorld( win, gridworld, visible, agent_x, agent_y, W,
                 end
             end
         end
+    end
+    
+    if debug_show_filenames
+        DrawFormattedText( win, worldname, 'center', offy-30, [255,0,0]);
     end
     
 end

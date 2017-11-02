@@ -25,37 +25,60 @@
 %    The first five world are practice trials, which are not scored
 %-----------------------------------------------------------------------
 
-function step_counter = solving_main_no_eyetracking(subject, window, mon)
+function [escaped_experiment, step_counter_1, step_counter_2, fileID] = ... 
+    solving_main_no_eyetracking(subject, window, mon, repeat_task_times)
 
-    %-----------------------------------------------------------------------
+     %-----------------------------------------------------------------------
     % setup the experiment
     %-----------------------------------------------------------------------
+         
+    step_counter_1 = 0;
+    step_counter_2 = 0;
     
-           
-    fixationlog_here = 'solving_log_dir/'; % logging
-       
-    s = strcat(pwd, '/world_maps/'); % load files from here
-    maps = loadAllMaps(s);           % maze maps
-    ptrials = size(maps,1);          % how many maze maps were loaded
-    cellsize = 80;                   % a size of a cell in pixels as it will be drawn
-    gray = 127;
-    
-    
-    number_of_practice_trials = 5;   % the first 5 maps that are loaded are not scored
-    black_rectangle_time = 1;
-   
-    scanList=zeros(1,256); % Listening to keyboard events... tell Psychtoolbox which keys we are interested in
-                           % This code can be easily changed to listening to a keypad
-    scanList(41)=1; %esc
-    scanList(81)=1; %down
-    scanList(82)=1; %up
-    scanList(80)=1; %esc
-    scanList(79)=1; %esc
+    fixationlog_here = 'solving_log_dir/';               % logging
 
-    trialsPermutation = randperm(ptrials-number_of_practice_trials) + number_of_practice_trials;
-    t = 1:1:number_of_practice_trials; % the first five trials are practice trials, which are not scored
-    trialsPermutation = [ t trialsPermutation];
+    test_maps_easy_block_1 = loadAllMaps(strcat(pwd, '/block1/world_design_easy/'));  % maze maps
+    number_of_test_trials_easy_block_1 = size(test_maps_easy_block_1,1);              % how many maze maps were loaded
     
+    test_maps_med_block_1 = loadAllMaps(strcat(pwd, '/block1/world_design_medium/')); % maze maps
+    number_of_test_trials_med_block_1 = size(test_maps_med_block_1,1);                % how many maze maps were loaded
+    
+    test_maps_hard_block_1 = loadAllMaps(strcat(pwd, '/block1/world_design_hard/'));  % maze maps
+    number_of_test_trials_hard_block_1 = size(test_maps_hard_block_1,1);              % how many maze maps were loaded
+    
+    test_maps_easy_block_2 = loadAllMaps(strcat(pwd, '/block2/world_design_easy/'));  % maze maps
+    number_of_test_trials_easy_block_2 = size(test_maps_easy_block_2,1);              % how many maze maps were loaded
+    
+    test_maps_med_block_2 = loadAllMaps(strcat(pwd, '/block2/world_design_medium/')); % maze maps
+    number_of_test_trials_med_block_2 = size(test_maps_med_block_2,1);                % how many maze maps were loaded
+    
+    test_maps_hard_block_2 = loadAllMaps(strcat(pwd, '/block2/world_design_hard/'));  % maze maps
+    number_of_test_trials_hard_block_2 = size(test_maps_hard_block_2,1);              % how many maze maps were loaded
+    
+    demo_maps = loadAllMaps(strcat(pwd, '/practice_world_maps/'));               % practice maze maps
+    number_of_practice_trials = size(demo_maps,1);           
+    
+    total_trials = number_of_test_trials_easy_block_1 + ...
+               number_of_test_trials_med_block_1 + number_of_test_trials_hard_block_1;
+           
+    %-----------------------------------------------------------------------
+    %
+    % test_maps and demo_maps are arrays of filenames
+    %
+    %-----------------------------------------------------------------------
+      
+    
+    %-----------------------------------------------------------------------
+    %
+    %  experimenter demo uses the pre-cofignred goal
+    %
+    %  patient practice ignores the baked in location of the goal, 
+    %  and places the goal at a random location, this is to show that the
+    %  goal really can be anywhere
+    %
+    %-----------------------------------------------------------------------
+    
+    practiceTrialPermutation = 1:1:number_of_practice_trials; % the first five trials are practice trials, which are not scored
     
     %-----------------------------------------------------------------------
     %
@@ -80,188 +103,238 @@ function step_counter = solving_main_no_eyetracking(subject, window, mon)
     [ keyIsDown, t, keyCode ] = KbCheck;   % wait for any key to be pressed
     KbReleaseWait;
     
-    fprintf('Response received...\n');
-    
     escapeKey = KbName('ESCAPE');
     if keyCode(escapeKey)
       fprintf('Experiment skipped.\n');
     else
        
-       escaped_experiment = 0; % is ESCAPE is pressed terminate the experiment; this is 
-                               % necessary to debug the code
-                               
-       step_counter = 0;       % counting the total number of steps that teh subject takes
-                               % over all trials
+      fprintf('Starting experiment...\n');
+      
+      fileID = fopen([fixationlog_here subject '_solving_log.txt'],'w');
+      fprintf(fileID,  'timestamp\tsubject\trt\teyex\teyey\tdatatype\ttimefrom\ttimeto\tpupil');
+      fprintf(fileID,  '\teyecellx\teyecelly\tworld\tpath\tvisible\ttrialtype');
+      fprintf(fileID,  '\tkeyPressed\tkeyAction\tvalidAction\tblackremains\tnumsquaresopen');
+      fprintf(fileID,  '\tsquaretype\tnumexits\n');  % The log file format  
        
+      fprintf('Starting demo...\n');
+      
+      [escaped_experiment, step_counter] = trialsLoop_no_et( imageAgent, ...
+            practiceTrialPermutation, ... % the order in which the worlds will be shown
+            demo_maps, ...                % the array of world maps loaded from file
+            0, ...                        % 0 -- demo, 1 -- practice, 2 -- experiment
+            fileID,...                    % the file where all data will be saved
+            window,...                    % needed by Psychtoolbox
+            mon,...                       % monitor config
+            subject,...                   % subject ID for this session
+            0,...                         % the index of the first trial in this block
+            number_of_practice_trials);   % number of trials in total in this block
 
-       fileID = fopen([fixationlog_here subject 'solving_log.txt'],'w');
-       fprintf(fileID,'subject\trt\tworld\tpath\tvisible');  % The file format   
-    
-       %-----------------------------------------------------------------------
-       %
-       %    Here is the main experiment loop 
-       %
-       %-----------------------------------------------------------------------
-              
-       for next_map_index=1:ptrials
-            
-              if escaped_experiment
-                  fprintf('Experiment terminated... escaping\n');
-                  break;
-              end
-              
-              %-----------------------------------------------------------------------
-              %
-              %    Initialise the trial 
-              %
-              %-----------------------------------------------------------------------
-              
-              exit_reached = 0;      % has the exit been reached yet?
-              steps=0;               % counting the number of steps that the subject took on this trial
-              
-              agent_path = '(1,1);'; % the agent will always start at the top-left corner
-              agent_x=1; agent_y=1; 
         
-              world = maps{trialsPermutation(next_map_index)}; % path to the current maze map
-              slash = max(strfind(world, '/'));
-              dot = max(strfind(world, '.'));
-              worldName = world(slash+1:dot-1);  % the name of the curent world
-              
-              % reading the map
-              [ gridworld, worldw, worldh, visible ] = initialiseWorld(maps, trialsPermutation(next_map_index));
-              
-              redraw_needed = 0;
-
-              %-----------------------------------------------------------------------
-              % 
-              %    Flashing a balck rectangle
-              %
-              %-----------------------------------------------------------------------
-              
-              Screen(window, 'FillRect', gray); 
-              Screen('FillRect', window, [0,0,0], [10 mon.hp-60 60 mon.hp-10] );
-              flipTime = Screen('Flip', window, flipTime, 0);
-              
-              %-----------------------------------------------------------------------
-              % 
-              %    Drawing a maze
-              %
-              %-----------------------------------------------------------------------
-              
-              stepStr = '';
-
-              if next_map_index <= number_of_practice_trials
-                stepStr=sprintf('Please use arrow keys to move. [Practice] Steps: %d', steps);
-              else
-                stepStr=sprintf('Please use arrow keys to move. [%d out of %d] Steps: %d', next_map_index-number_of_practice_trials, ptrials-number_of_practice_trials, steps);
-              end
-
-              [offx, offy] = drawWorld(window, gridworld, visible, agent_x, agent_y, mon.wp, mon.hp, imageAgent, cellsize, 0);
-              flipTime = Screen('Flip', window, flipTime + black_rectangle_time, 0);
+      %-----------------------------------------------------------------------
+      %
+      %    Intro to practice 
+      %
+      %-----------------------------------------------------------------------
+      
+      if escaped_experiment
+          fprintf('Demo skipped...\n');
+          escaped_experiment = 0;
+      end
+      
+      escaped_experiment = showIntroToPractice(window);
+      
+      if escaped_experiment
+          fprintf('Practice skipped...\n');
+      end
+                 
+      if ~escaped_experiment
             
-              
-              tic;  %get current time so that we can record theit reaction times
-              rt_end=0;
-              
-              while ~exit_reached
-                  
-                                   
-                  %-----------------------------------------------------------------------
-                  %
-                  %    Listen for interaction  
-                  %
-                  %-----------------------------------------------------------------------
-                  
-                   FlushEvents('keyDown');
-                   [ keyIsDown, t, keyCode ] = KbCheck([], scanList);   %keyCode is an array of 256
-                   ikeyCode = find(keyCode);
-                   
-                   if ~isempty(ikeyCode)
-                       [keyCode] = readKeyboardBufferAndFlush(scanList, ikeyCode, keyCode);
-                   end
-                   
-                   has_moved = 0; % was the agent moved during interaction?
-                   if keyCode(escapeKey)
-                      fprintf('Experiment skipped.\n');
-                      exit_reached = 1;
-                      escaped_experiment = 1;
-                   elseif keyCode(KbName('DownArrow'))
-                       
-                       %process the keypress only if interaction is allowed
-                       if agent_y < size(gridworld,1) 
-                           if gridworld(agent_y+1, agent_x) ~=3
-                            agent_y=agent_y+1;
-                            has_moved=1;
-                           end
-                       end
-   
-                   elseif keyCode(KbName('UpArrow'))
-                       
-                       if agent_y > 1 
-                           if gridworld(agent_y-1, agent_x) ~=3
-                            agent_y=agent_y-1;
-                            has_moved=1;
-                           end
-                       end
-                          
-                   elseif keyCode(KbName('LeftArrow'))
-                       
-                       if agent_x > 1
-                           if gridworld(agent_y, agent_x-1) ~=3
-                            agent_x=agent_x-1;
-                            has_moved=1;
-                           end
-                       end
-                           
-                   elseif keyCode(KbName('RightArrow'))
-                       
-                       if agent_x < size(gridworld,2) 
-                           if gridworld(agent_y, agent_x+1) ~=3
-                            agent_x=agent_x+1;
-                            has_moved=1;
-                           end
-                       end
-                           
-                   elseif keyCode > 0
-                       fprintf('Unexpected key %s %d\n', KbName(keyCode), keyCode)
-                   end
-                   
-                   %update the maze if the agent has moved
-                   if has_moved
-                       visible = updateVisible(gridworld, visible, agent_x, agent_y);
-                       steps = steps+1;
-                       rt_end=toc;
-                       tic;
-                       agent_path = sprintf('%s(%d,%d);', agent_path, agent_x, agent_y);
-                       has_moved = 0;
-                       redraw_needed = 1;
-                       if next_map_index > number_of_practice_trials
-                           step_counter = step_counter+1;
-                       end
-                   end
-                   
-                   if (redraw_needed )
-                        writeToFile_no_ET(fileID, subject, rt_end*1000,  worldName, agent_path, visible); 
-                        redrawWorld(worldName, gray, window, agent_y, agent_x, next_map_index, ptrials, steps, gridworld, visible, mon.wp, mon.hp, imageAgent, cellsize, flipTime, offy); 
-                   end
+            repeat_practice = 2;
+            
+            while repeat_practice == 2 && ~escaped_experiment
+            
+                fprintf('Starting practice...\n');
+                
+                [escaped_experiment, step_counter] = trialsLoop_no_et( imageAgent, ...
+                    practiceTrialPermutation, ... % the order in which the worlds will be shown
+                    demo_maps, ...% the array of world maps loaded from file
+                    1, ... % 0 -- demo, 1 -- practice, 2 -- experiment
+                    fileID, window, mon, subject, 0, number_of_practice_trials );
+                
+                 %-----------------------------------------------------------------------
+                 %
+                 %    Ask if the subject wants to continue 
+                 %
+                 %-----------------------------------------------------------------------
+                 
+                 repeat_practice = askIfMorePractice(window, repeat_task_times, total_trials);
+                 
+                 if repeat_practice == 1
+                     escaped_experiment=1;
+                 end
+                 
+            end
+      else
+          escaped_experiment = 0;
+      end
+                
+      done = 0;
+     
+     
+     
+      %-----------------------------------------------------------------------
+      %
+      %    Here is the main experiment loop 
+      %
+      %-----------------------------------------------------------------------
+            
 
-                   
-                   if (redraw_needed )
-                       redraw_needed = 0;
-                       flipTime = Screen('Flip', window, flipTime + 0.01,0);
-                   end
-                   
-                   if (gridworld(agent_y, agent_x) == 2)
-                       exit_reached = 1;
-                       %fprintf('Exit!\n');
-                   end
-                   
-                   
-              end
+      while ~escaped_experiment && ~done
+
+          
+            %-----------------------------------------------------------------------
+            %
+            %    Sow the easy trials first 
+            %
+            %-----------------------------------------------------------------------
+      
+            testTrialsPermutation = randperm(number_of_test_trials_easy_block_1);
+
+            [escaped_experiment, step_counter] = trialsLoop_no_et( imageAgent, ... 
+                testTrialsPermutation, ... % the order in which the worlds will be shown
+                test_maps_easy_block_1, ...% the array of world maps loaded from file
+                2, ... % 0 -- demo, 1 -- practice, 2 -- experiment
+                fileID, window, mon, subject, 0, total_trials);
+
+            if escaped_experiment
+                break;
+            end
+
+            %-----------------------------------------------------------------------
+            %
+            %    Sow the medium trials  
+            %
+            %-----------------------------------------------------------------------
+      
+            step_counter_1 = step_counter_1 + step_counter;
+
+            testTrialsPermutation = randperm(number_of_test_trials_med_block_1);
+
+            [escaped_experiment, step_counter] = trialsLoop_no_et( imageAgent, ... 
+                testTrialsPermutation, ... % the order in which the worlds will be shown
+                test_maps_med_block_1, ...% the array of world maps loaded from file
+                2, ... % 0 -- demo, 1 -- practice, 2 -- experiment
+                fileID, window, mon, subject, ...
+                number_of_test_trials_easy_block_1, total_trials);
+
+            step_counter_1 = step_counter_1 + step_counter;
+
+            if escaped_experiment
+                break;
+            end
+
+            %-----------------------------------------------------------------------
+            %
+            %    Sow the hard trials  
+            %
+            %-----------------------------------------------------------------------
+            
+            testTrialsPermutation    = randperm(number_of_test_trials_hard_block_1);
+
+            [escaped_experiment, step_counter] = trialsLoop_no_et( imageAgent, ... 
+                testTrialsPermutation, ... % the order in which the worlds will be shown
+                test_maps_hard_block_1, ...% the array of world maps loaded from file
+                2, ... % 0 -- demo, 1 -- practice, 2 -- experiment
+                fileID, window, mon, subject, ...
+                number_of_test_trials_easy_block_1+number_of_test_trials_med_block_1,  total_trials);
+
+            step_counter_1 = step_counter_1 + step_counter;
+
+            if escaped_experiment
+                break;
+            end
+            
+            repeats = 1;
+            
+            while repeats < repeat_task_times
+
+                    repeats = repeats + 1;
+                    
+                    escaped_experiment = showSplash(window);
+
+                    if escaped_experiment
+                        fprintf('Second half skipped...\n');
+                        break;
+                    end
+
+                    total_trials = number_of_test_trials_easy_block_2 + ...
+                       number_of_test_trials_med_block_2 + number_of_test_trials_hard_block_2;
+
+                    %-----------------------------------------------------------------------
+                    %
+                    %     easy trials
+                    %
+                    %-----------------------------------------------------------------------
+                    
+                    testTrialsPermutation  = randperm(number_of_test_trials_easy_block_2); 
+
+                    [escaped_experiment, step_counter] = trialsLoop_no_et( imageAgent, ... 
+                        testTrialsPermutation, ... % the order in which the worlds will be shown
+                        test_maps_easy_block_2, ...% the array of world maps loaded from file
+                        2, ... % 0 -- demo, 1 -- practice, 2 -- experiment
+                        fileID, window, mon, subject, 0, total_trials );
+
+                    step_counter_2 = step_counter_2 + step_counter;
+
+                    if escaped_experiment
+                        break;
+                    end
+
+                    %-----------------------------------------------------------------------
+                    %
+                    %     medium trials
+                    %
+                    %-----------------------------------------------------------------------
+                    
+                    testTrialsPermutation  = randperm(number_of_test_trials_med_block_2); 
+
+                    [escaped_experiment, step_counter] = trialsLoop_no_et( imageAgent, ... 
+                        testTrialsPermutation, ... % the order in which the worlds will be shown
+                        test_maps_med_block_2, ...% the array of world maps loaded from file
+                        2, ... % 0 -- demo, 1 -- practice, 2 -- experiment
+                        fileID, window, mon, subject, ...
+                        number_of_test_trials_easy_block_2,  total_trials);
+
+                    step_counter_2 = step_counter_2 + step_counter;
+
+                    if escaped_experiment
+                        break;
+                    end
+
+                    %-----------------------------------------------------------------------
+                    %
+                    %     hard trials
+                    %
+                    %-----------------------------------------------------------------------
+                    
+                    testTrialsPermutation  = randperm(number_of_test_trials_hard_block_2); 
+
+                    [escaped_experiment, step_counter] = trialsLoop_no_et( imageAgent, ... 
+                        testTrialsPermutation, ... % the order in which the worlds will be shown
+                        test_maps_hard_block_2, ...% the array of world maps loaded from file
+                        2, ... % 0 -- demo, 1 -- practice, 2 -- experiment
+                        fileID, window, mon, subject, ...
+                        number_of_test_trials_easy_block_2+number_of_test_trials_med_block_2,  total_trials);
+
+                    step_counter_2 = step_counter_2 + step_counter;
+
+                    if escaped_experiment
+                        break;
+                    end
+            end
+
+            done = 1;
         end
-        
-        
+
     end
-    
-    fclose(fileID);
 end
